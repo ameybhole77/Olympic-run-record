@@ -1,0 +1,172 @@
+---
+title: "Olympic Run Record"
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    fig_height: 12
+    fig_width: 12
+    highlight: tango
+    theme: united
+---
+
+
+```{r include = FALSE, cache = FALSE, echo = FALSE}
+# Load packages
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(clValid)
+
+# Load the data
+run_record <- read.table("/media/amey/1E02DDE102DDBDC9/Amey/Work/Data A/Assignments/Clustering/run_record.csv", quote="\"", comment.char="")
+
+```
+
+
+### Introduction
+
+
+The objective of this project was analyzing the data of the Olymic run record to cluster countries based on their run records using different clustering methods and to analyze which one would produce the best result. 
+
+
+### K-means clustering 
+
+
+```{r, message = FALSE, warning = FALSE}
+
+# Set random seed.
+set.seed(1)
+
+# Explore your data with str() and summary()
+str(run_record)
+summary(run_record)
+
+# Cluster run_record using k-means 
+run_km = kmeans(run_record , 5, nstart = 20)
+
+# Plot the 100m as function of the marathon. Color using clusters
+plot(run_record$marathon ,run_record$X100m , col = run_km$cluster  , xlab = "Marathon" , ylab = "100m")
+
+# Calculate Dunn's index
+dunn_km = dunn(clusters = run_km$cluster ,Data = run_record)
+dunn_km
+
+```
+
+
+As you can see from the plot the the unstandarized clusters are completely dominated by the marathon records; you can even separate every cluster only based on the marathon records. Moreover Dunn's index seems to be quite low.
+
+
+### K-means clustering on standardized data
+
+
+In order to get satisfying results, the data needs to be standardized which is done using scale function.
+
+
+```{r, message = FALSE, warning = FALSE}
+# Set random seed. 
+set.seed(1)
+
+# Standardize run_record, transform to a dataframe
+run_record_sc = as.data.frame(scale(run_record))
+
+# Cluster run_record_sc using k-means
+run_km_sc = kmeans(run_record_sc , 5, nstart= 20)
+
+# Plot records on 100m as function of the marathon. 
+plot(run_record_sc$marathon ,run_record_sc$X100m , col = run_km_sc$cluster , xlab = "Marathon" , ylab = "100m")
+
+# Compare the resulting clusters in a table
+table(run_km$cluster , run_km_sc$cluster)
+
+# Calculate Dunn's index
+dunn_km_sc = dunn(clusters = run_km_sc$cluster ,Data = run_record_sc)
+dunn_km_sc
+
+```
+
+
+The plot now shows the influence of the 100m records on the resulting clusters! Dunn's index is clear about it, the standardized clusters are more compact and better separated.
+
+
+### Hierarchical clustering with single linkage
+
+
+```{r, message = FALSE, warning = FALSE}
+# Apply dist() to run_record_sc
+run_dist = dist(run_record_sc )
+
+# Apply hclust() to run_dist
+run_single = hclust(run_dist , method = "single")
+
+# Apply cutree() to run_single.
+memb_single = cutree(run_single , k =5)
+
+# Apply plot() on run_single to draw the dendrogram
+plot(run_single )
+
+# Apply rect.hclust() on run_single to draw the boxes
+rect.hclust(run_single ,k= 5 ,border = 2:6)
+
+```
+
+
+As you can see from the plot that there are two islands Samoa and Cook's Islands, who are not known for their sports performances, have both been placed in their own groups. The single-linkage method appears to be placing each outlier in its own cluster.
+
+
+### Hierarchical clustering with complete linkage
+
+
+```{r, message = FALSE, warning = FALSE}
+
+# Apply hclust() to run_dist
+run_complete = hclust(run_dist , method = "complete")
+
+# Apply cutree() to run_complete
+memb_complete = cutree(run_complete , k =5)
+
+# Apply plot() on run_complete to draw the dendrogram
+plot(run_complete)
+
+# Apply rect.hclust() on run_complete to draw the boxes
+rect.hclust(run_complete ,k =5, border = 2:6)
+
+# table() the clusters memb_single and memb_complete.
+table(memb_single , memb_complete )
+```
+
+
+Compare the two plots. The five clusters differ significantly from the single-linkage clusters. That one big cluster is now split up into 4 medium sized clusters.
+
+
+### Comparing Dunn's Index
+
+
+Compare the Dunn's index of the three clustering methods to see which will give the best results.
+
+
+```{r, message = FALSE, warning = FALSE}
+# Set random seed. 
+set.seed(100)
+
+# Dunn's index for k-means
+dunn_km = dunn(cluster = run_km_sc$cluster , Data = run_record_sc)
+
+# Dunn's index for single-linkage
+dunn_single = dunn(cluster = memb_single , Data = run_record_sc)
+
+# Dunn's index for complete-linkage
+dunn_complete = dunn(cluster = memb_complete, Data = run_record_sc)
+
+# Compare k-means with single-linkage
+table(run_km_sc$cluster,memb_single)
+
+# Compare k-means with complete-linkage
+table(run_km_sc$cluster ,memb_complete )
+
+```
+
+
+In conclusion the single-linkage method returned the highest ratio of minimal intercluster-distance to maximal cluster diameter thereby giving the most accurate result out of the three methods.
+
